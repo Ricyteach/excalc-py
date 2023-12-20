@@ -1,5 +1,7 @@
 # excalc
 
+`pip install excalc-py`
+
 #### Turn your Excel calculators into python functions.
 
 Say we have a Very Special Workbook (VSB) called `vsb.xlsx`. We are using this workbook to do some very special calculations.
