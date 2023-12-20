@@ -1,4 +1,4 @@
-from excalc import create_calculation, adapt_function
+from excalc_py import create_calculation, adapt_function
 import pytest
 
 

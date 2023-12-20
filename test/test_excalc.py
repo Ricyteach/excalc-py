@@ -1,4 +1,4 @@
-from excalc import create_calculation, _Calculation
+from excalc_py import create_calculation, _Calculation
 import pytest
 
 

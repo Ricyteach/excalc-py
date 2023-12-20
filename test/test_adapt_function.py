@@ -1,5 +1,5 @@
 import pytest
-from excalc import adapt_function
+from excalc_py import adapt_function
 
 
 @pytest.fixture
