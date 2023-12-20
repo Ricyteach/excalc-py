@@ -1,4 +1,4 @@
-# excalc
+# excalc-py
 
 `pip install excalc-py`
 
@@ -26,7 +26,7 @@ Now, how can we turn this Excel calculator into a python function? Like so:
 
 ```python
 import xlwings as xw
-from excalc import create_calculation
+from excalc_py import create_calculation
 
 # first, using xlwings, we'll get a reference to our sheet
 sheet = xw.App().books.open("vsb.xlsx").sheets[0]  # Sheet 1 of vsb.xlsx
@@ -63,7 +63,7 @@ You got it:
 
 ```python
 import xlwings as xw
-from excalc import create_calculation, adapt_function
+from excalc_py import create_calculation, adapt_function
 
 # as before, using xlwings, we'll get references to our input and output locations
 sheet = xw.App(visible=False).books.open("vsb.xlsx").sheets[0]  # Sheet 1 of vsb.xlsx
