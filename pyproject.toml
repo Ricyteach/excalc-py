@@ -1,0 +1,21 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "excalc"
+authors = [{name = "Ricky L Teachey Jr", email = "ricky@teachey.org"}]
+license = {file = "LICENSE"}
+classifiers = ["License :: OSI Approved :: MIT License"]
+dynamic = ["version", "description"]
+dependencies = [
+    "xlwings >=0.30",
+]
+
+[project.urls]
+Home = "https://github.com/Ricyteach/excalc"
+
+[project.optional-dependencies]
+test = [
+    "pytest >=7.4",
+]
