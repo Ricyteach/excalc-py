@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.urls]
-Home = "https://github.com/Ricyteach/excalc"
+Home = "https://github.com/Ricyteach/excalc-py"
 
 [project.optional-dependencies]
 test = [
