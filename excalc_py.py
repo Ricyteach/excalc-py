@@ -1,8 +1,9 @@
 """Turn your Excel calculators into python functions."""
 
-__version__ = "0.0.1"
+__version__ = "0.0.2"
 
 from functools import wraps
+from inspect import signature, BoundArguments, Parameter
 import xlwings as xw
 import collections.abc
 
@@ -11,6 +12,7 @@ class _Calculation:
     """Object used to work with the Excel ranges and get the calculations."""
 
     _input_rng_list: list[xw.main.Range] = None
+    _input_rng_dict: dict[str, xw.main.Range] = None
     _output_rng: xw.main.Range = None
 
     @property
@@ -28,6 +30,20 @@ class _Calculation:
             self._input_rng_list.append(input_rng)
 
     @property
+    def input_rng_dict(self):
+        return self._input_rng_dict
+
+    @input_rng_dict.setter
+    def input_rng_dict(self, value):
+        self._input_rng_dict = {}
+        for k, input_rng in value.items():
+            if not isinstance(input_rng, xw.main.Range):
+                raise TypeError(
+                    f"Range objects are required input_rng_list, not {type(input_rng)}"
+                )
+        self._input_rng_dict.update(value)
+
+    @property
     def output_rng(self):
         return self._output_rng
 
@@ -41,7 +57,8 @@ class _Calculation:
         """Write the input args to the input ranges."""
 
         if kwargs:
-            raise NotImplementedError("kwargs in calculation not supported")
+            raise NotImplementedError("kwargs in calculation not yet supported")
+
         for arg, input_rng in zip(args, self.input_rng_list, strict=True):
             shape = input_rng.shape
             if len(shape) != 2:
@@ -76,6 +93,7 @@ class _Calculation:
 
     def retrieve(self):
         """Get the output from the output range."""
+
         return self.output_rng.value
 
     def __call__(self, *args, **kwargs):
@@ -83,14 +101,18 @@ class _Calculation:
         return self.retrieve()
 
 
-def create_calculation(input_rng_list, output_rng):
+def create_calculation(output_rng, /, *input_rng_list, **input_rng_dict):
     """Decorator for turning Excel apps into functions.
 
     The functions use Excel in the background instead of computation being completed in python.
     """
 
+    if input_rng_dict:
+        raise NotImplementedError("**kwargs in create_calculation not yet supported")
+
     calc = _Calculation()
     calc.input_rng_list = input_rng_list
+    calc.input_rng_dict = input_rng_dict
     calc.output_rng = output_rng
 
     def wrapper(func):
@@ -104,17 +126,62 @@ def create_calculation(input_rng_list, output_rng):
     return wrapper
 
 
-def adapt_function(input_adapter_list, output_adapter):
+def do_nothing_adapter(item):
+    return item
+
+
+def adapt_function(output_adapter=None, /, *input_adapter_list, **kwargs):
     """Decorator that allows modification of the inputs and outputs."""
 
+    # handle case of no output adapter
+    if output_adapter is None:
+        output_adapter = do_nothing_adapter
+
     def wrapper(func):
+        sig = signature(func)
+
+        # integrate kwargs adapters into the rest of the adapters
+        partial_bound_adapters = sig.bind_partial(*input_adapter_list, **kwargs)
+
+        full_input_adapter_list = []
+        for param_name in sig.parameters.keys():
+            adapter = partial_bound_adapters.arguments.pop(param_name, do_nothing_adapter)
+            full_input_adapter_list.append(adapter)
+
+        if len(sig.parameters) != len(full_input_adapter_list):
+            raise TypeError(
+                f"the length of the function {func.__name__} parameters list ({len(sig.parameters)}) must "
+                f"match the length of the input adapter list ({len(full_input_adapter_list)})"
+            )
+
+        # create a modified input adapter list that takes into account *args and **kwargs supplied to called func
+        modified_input_adapter_list = []
+        for input_adapter, parameter in zip(full_input_adapter_list, sig.parameters.values(), strict=True):
+            if parameter.kind is Parameter.VAR_POSITIONAL:
+
+                def positional_adapter(pos_args):
+                    return [input_adapter(pos_arg) for pos_arg in pos_args]
+
+                input_adapter = positional_adapter
+            elif parameter.kind is Parameter.VAR_KEYWORD:
+
+                def keyword_adapter(kwd_args: dict):
+                    return {k: input_adapter(v) for k, v in kwd_args.items()}
+
+                input_adapter = keyword_adapter
+            modified_input_adapter_list.append(input_adapter)
+
         @wraps(func)
         def wrapped(*args, **kwargs):
-            args = [
-                input_adapter(arg)
-                for input_adapter, arg in zip(input_adapter_list, args, strict=True)
-            ]
-            result = func(*args, **kwargs)
+            bound_arguments = sig.bind(*args, **kwargs)
+            bound_arguments.apply_defaults()
+            bound_arguments.arguments = {
+                k: adapter(v)
+                for adapter, (k, v) in zip(
+                    modified_input_adapter_list, bound_arguments.arguments.items()
+                )
+            }
+            result = func(*bound_arguments.args, **bound_arguments.kwargs)
             return output_adapter(result)
 
         return wrapped

@@ -38,7 +38,7 @@ input_rng1 = sheet.range("B1")
 output_rng = sheet.range("B2")
 
 # now just create a python function, and decorate it
-@create_calculation([input_rng1], output_rng)
+@create_calculation(output_rng, diameter=input_rng1)
 def weird_circle_area(diameter):
     pass
 ```
@@ -88,8 +88,8 @@ def output_sq_in_adapter(area_sq_in):
     return area
 
 # now just create a python function as before, but with the extra adapter decorator
-@adapt_function([input_feet_adapter], output_sq_in_adapter)
-@create_calculation([input_rng1], output_rng)
+@adapt_function(output_sq_in_adapter, input_feet_adapter)
+@create_calculation(output_rng, input_rng1)
 def weird_circle_area(diameter):
     pass
 ```

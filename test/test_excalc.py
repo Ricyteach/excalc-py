@@ -19,7 +19,7 @@ def calculation():
 
 @pytest.fixture
 def my_func_calculation(input_rng1, input_rng2, output_rng):
-    @create_calculation([input_rng1, input_rng2], output_rng)
+    @create_calculation(output_rng, input_rng1, input_rng2, )
     def my_func(a, b):
         pass
 

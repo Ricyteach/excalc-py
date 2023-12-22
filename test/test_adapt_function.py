@@ -13,13 +13,30 @@ def expected_result():
 
 
 @pytest.fixture
-def my_func_calculation(input_adapter, output_adapter):
-    @adapt_function([input_adapter, input_adapter], output_adapter)
-    def my_func(a, b):
+def my_func1_calculation(output_adapter, input_adapter):
+    @adapt_function(
+        output_adapter, input_adapter, input_adapter
+    )
+    def my_func(a, b, *args, **kwargs):
         return a, b
 
     return my_func
 
 
-def test_adapt_for_units(my_func_calculation, inputs, expected_result):
-    assert my_func_calculation(*inputs) == expected_result
+def test_adapt_for_units1(my_func1_calculation, inputs, expected_result):
+    assert my_func1_calculation(*inputs) == expected_result
+
+
+@pytest.fixture
+def my_func2_calculation(output_adapter, input_adapter):
+    @adapt_function(
+        output_adapter, input_adapter, input_adapter, input_adapter, input_adapter
+    )
+    def my_func(a, b, *args, **kwargs):
+        return a, b
+
+    return my_func
+
+
+def test_adapt_for_units2(my_func2_calculation, inputs, expected_result):
+    assert my_func2_calculation(*inputs) == expected_result

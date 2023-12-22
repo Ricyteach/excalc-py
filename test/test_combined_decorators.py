@@ -4,8 +4,8 @@ import pytest
 
 @pytest.fixture
 def decorated_func(input_rng1, input_rng2, output_rng, input_adapter, output_adapter):
-    @adapt_function([input_adapter, input_adapter], output_adapter)
-    @create_calculation([input_rng1, input_rng2], output_rng)
+    @adapt_function(output_adapter, input_adapter, input_adapter)
+    @create_calculation(output_rng, input_rng1, input_rng2)
     def func(a, b):
         pass
 
