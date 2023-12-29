@@ -1,65 +1,87 @@
-"""Turn your Excel calculators into python functions."""
+"""Turn your Excel calculators into python functions.
 
-__version__ = "0.0.2"
+Excalc currently requires xlwings. May support other python Excel libraries in the future.
+"""
+
+__version__ = "0.0.3"
 
 from functools import wraps
-from inspect import signature, BoundArguments, Parameter
+from inspect import signature, Parameter, Signature, BoundArguments
+from typing import Protocol
 import xlwings as xw
 import collections.abc
 
 
-class _Calculation:
-    """Object used to work with the Excel ranges and get the calculations."""
+def _check_input_rng_list(input_rng_args_lst):
+    for input_rng in input_rng_args_lst:
+        if not isinstance(input_rng, xw.main.Range):
+            raise TypeError(
+                f"Range objects are required _ExcelCalculation args, not {type(input_rng)}"
+            )
 
-    _input_rng_list: list[xw.main.Range] = None
-    _input_rng_dict: dict[str, xw.main.Range] = None
-    _output_rng: xw.main.Range = None
 
-    @property
-    def input_rng_list(self):
-        return self._input_rng_list
+def _check_input_rng_dict(input_rng_kwargs_dct):
+    for k, input_rng in input_rng_kwargs_dct.items():
+        if not isinstance(input_rng, xw.main.Range):
+            raise TypeError(
+                f"Range objects are required _ExcelCalculation kwargs, not {type(input_rng)}"
+            )
 
-    @input_rng_list.setter
-    def input_rng_list(self, value):
-        self._input_rng_list = []
-        for input_rng in value:
-            if not isinstance(input_rng, xw.main.Range):
-                raise TypeError(
-                    f"Range objects are required input_rng_list, not {type(input_rng)}"
-                )
-            self._input_rng_list.append(input_rng)
 
-    @property
-    def input_rng_dict(self):
-        return self._input_rng_dict
+def _check_output_rng(output_rng_arg):
+    if not isinstance(output_rng_arg, xw.main.Range):
+        raise TypeError("Range object required for output_rng")
 
-    @input_rng_dict.setter
-    def input_rng_dict(self, value):
-        self._input_rng_dict = {}
-        for k, input_rng in value.items():
-            if not isinstance(input_rng, xw.main.Range):
-                raise TypeError(
-                    f"Range objects are required input_rng_list, not {type(input_rng)}"
-                )
-        self._input_rng_dict.update(value)
 
-    @property
-    def output_rng(self):
-        return self._output_rng
+class _ExcelCalculation:
+    """Object used to work with the Excel ranges and get the calculations.
 
-    @output_rng.setter
-    def output_rng(self, value):
-        if not isinstance(value, xw.main.Range):
-            raise TypeError("Range object required for output_rng")
-        self._output_rng = value
+    Calling the object with arguments performs the calculation using Excel.
+    """
+
+    signature: Signature = None
+    bound_input_rngs: BoundArguments = None
+
+    def __init__(self, func, output_rng, *input_rng_args, **input_rng_kwargs):
+        self.signature = signature(func)
+        _check_output_rng(output_rng)
+        self.output_rng = output_rng
+        _check_input_rng_list(input_rng_args)
+        input_rng_list = self.input_rng_list = list(input_rng_args)
+        _check_input_rng_dict(input_rng_kwargs)
+        input_rng_dict = self.input_rng_dict = input_rng_kwargs
+        sig = self.signature = signature(func)
+
+        bound_input_rngs = self.bound_input_rngs = sig.bind(
+            *input_rng_list, **input_rng_dict
+        )
+
+        # disallow *args or **kwargs in decorated functions (doesn't make any sense)
+        if any(
+            sig.parameters[k].kind in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL)
+            for k in bound_input_rngs.arguments.keys()
+        ):
+            starred = (
+                repr(param)[repr(param).index("*"): -2]
+                for param in sig.parameters.values()
+                if param.kind in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL)
+            )
+            raise TypeError(
+                f"{', '.join(starred)} are not allowed in the decorated function signature"
+            )
+
+        self.parameter_rng_list = list(bound_input_rngs.arguments.values())
 
     def apply(self, *args, **kwargs):
         """Write the input args to the input ranges."""
 
-        if kwargs:
-            raise NotImplementedError("kwargs in calculation not yet supported")
+        bound_args = self.signature.bind(*args, **kwargs)
 
-        for arg, input_rng in zip(args, self.input_rng_list, strict=True):
+        for arg, input_rng in zip(
+            bound_args.arguments.values(),
+            self.bound_input_rngs.arguments.values(),
+            strict=True,
+        ):
             shape = input_rng.shape
             if len(shape) != 2:
                 raise RuntimeError(f"unexpected type of range shape for {shape}")
@@ -101,21 +123,22 @@ class _Calculation:
         return self.retrieve()
 
 
+class SupportsCalculation(Protocol):
+    calculation: _ExcelCalculation
+
+    def __call__(self, *args, **kwargs):
+        ...
+
+
 def create_calculation(output_rng, /, *input_rng_list, **input_rng_dict):
     """Decorator for turning Excel apps into functions.
 
     The functions use Excel in the background instead of computation being completed in python.
     """
 
-    if input_rng_dict:
-        raise NotImplementedError("**kwargs in create_calculation not yet supported")
+    def wrapper(func) -> SupportsCalculation:
+        calc = _ExcelCalculation(func, output_rng, *input_rng_list, **input_rng_dict)
 
-    calc = _Calculation()
-    calc.input_rng_list = input_rng_list
-    calc.input_rng_dict = input_rng_dict
-    calc.output_rng = output_rng
-
-    def wrapper(func):
         @wraps(func)
         def wrapped(*args, **kwargs):
             return calc(*args, **kwargs)
@@ -127,10 +150,12 @@ def create_calculation(output_rng, /, *input_rng_list, **input_rng_dict):
 
 
 def do_nothing_adapter(item):
+    """Default adapter when no adapter is supplied for an input."""
+
     return item
 
 
-def adapt_function(output_adapter=None, /, *input_adapter_list, **kwargs):
+def adapt_function(output_adapter=None, /, *input_adapter_list, **input_adapter_dict):
     """Decorator that allows modification of the inputs and outputs."""
 
     # handle case of no output adapter
@@ -141,12 +166,16 @@ def adapt_function(output_adapter=None, /, *input_adapter_list, **kwargs):
         sig = signature(func)
 
         # integrate kwargs adapters into the rest of the adapters
-        partial_bound_adapters = sig.bind_partial(*input_adapter_list, **kwargs)
+        partial_bound_adapters = sig.bind_partial(
+            *input_adapter_list, **input_adapter_dict
+        )
 
         full_input_adapter_list = []
         for param_name in sig.parameters.keys():
-            adapter = partial_bound_adapters.arguments.pop(param_name, do_nothing_adapter)
-            full_input_adapter_list.append(adapter)
+            bound_adapter = partial_bound_adapters.arguments.pop(
+                param_name, do_nothing_adapter
+            )
+            full_input_adapter_list.append(bound_adapter)
 
         if len(sig.parameters) != len(full_input_adapter_list):
             raise TypeError(
@@ -156,7 +185,9 @@ def adapt_function(output_adapter=None, /, *input_adapter_list, **kwargs):
 
         # create a modified input adapter list that takes into account *args and **kwargs supplied to called func
         modified_input_adapter_list = []
-        for input_adapter, parameter in zip(full_input_adapter_list, sig.parameters.values(), strict=True):
+        for input_adapter, parameter in zip(
+            full_input_adapter_list, sig.parameters.values(), strict=True
+        ):
             if parameter.kind is Parameter.VAR_POSITIONAL:
 
                 def positional_adapter(pos_args):

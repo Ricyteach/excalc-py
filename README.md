@@ -29,7 +29,7 @@ import xlwings as xw
 from excalc_py import create_calculation
 
 # first, using xlwings, we'll get a reference to our sheet
-sheet = xw.App().books.open("vsb.xlsx").sheets[0]  # Sheet 1 of vsb.xlsx
+sheet = xw.App(visible=False).books.open("vsb.xlsx").sheets[0]  # Sheet 1 of vsb.xlsx
 
 # and define where the inputs are
 input_rng1 = sheet.range("B1")

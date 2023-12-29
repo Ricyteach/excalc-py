@@ -14,9 +14,7 @@ def expected_result():
 
 @pytest.fixture
 def my_func1_calculation(output_adapter, input_adapter):
-    @adapt_function(
-        output_adapter, input_adapter, input_adapter
-    )
+    @adapt_function(output_adapter, input_adapter, input_adapter)
     def my_func(a, b, *args, **kwargs):
         return a, b
 
