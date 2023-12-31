@@ -24,3 +24,8 @@ def expected_output():
 
 def test_combined_decorators(decorated_func, inputs, expected_output):
     assert decorated_func(*inputs) == expected_output
+
+
+def test_combined_decorators_b_None(decorated_func, inputs, expected_output, output_adapter, input_adapter):
+    # NOTE: b is not supplied by python, and just uses the value already in Excel sheet (zero)
+    assert decorated_func(inputs[0], b=None) == output_adapter(input_adapter(inputs[0]))

@@ -36,5 +36,5 @@ def my_func2_calculation(output_adapter, input_adapter):
     return my_func
 
 
-def test_adapt_for_units2(my_func2_calculation, inputs, expected_result):
+def test_adapt(my_func2_calculation, inputs, expected_result):
     assert my_func2_calculation(*inputs) == expected_result

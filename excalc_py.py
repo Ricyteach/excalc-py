@@ -3,7 +3,7 @@
 Excalc currently requires xlwings. May support other python Excel libraries in the future.
 """
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 from functools import wraps
 from inspect import signature, Parameter, Signature, BoundArguments
@@ -62,7 +62,7 @@ class _ExcelCalculation:
             for k in bound_input_rngs.arguments.keys()
         ):
             starred = (
-                repr(param)[repr(param).index("*"): -2]
+                repr(param)[repr(param).index("*") : -2]
                 for param in sig.parameters.values()
                 if param.kind in (Parameter.VAR_KEYWORD, Parameter.VAR_POSITIONAL)
             )
@@ -82,6 +82,10 @@ class _ExcelCalculation:
             self.bound_input_rngs.arguments.values(),
             strict=True,
         ):
+            # a None arg is a signal not to enter anything into that input range
+            if arg is None:
+                continue
+            # shape for range has to be 2d
             shape = input_rng.shape
             if len(shape) != 2:
                 raise RuntimeError(f"unexpected type of range shape for {shape}")
@@ -207,7 +211,7 @@ def adapt_function(output_adapter=None, /, *input_adapter_list, **input_adapter_
             bound_arguments = sig.bind(*args, **kwargs)
             bound_arguments.apply_defaults()
             bound_arguments.arguments = {
-                k: adapter(v)
+                k: adapter(v) if v is not None else v
                 for adapter, (k, v) in zip(
                     modified_input_adapter_list, bound_arguments.arguments.items()
                 )
